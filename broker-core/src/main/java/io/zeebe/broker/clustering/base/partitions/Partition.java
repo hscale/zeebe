@@ -20,11 +20,13 @@ package io.zeebe.broker.clustering.base.partitions;
 import static io.zeebe.broker.exporter.ExporterManagerService.EXPORTER_PROCESSOR_ID;
 import static io.zeebe.broker.exporter.ExporterManagerService.PROCESSOR_NAME;
 
+import io.atomix.cluster.messaging.ClusterCommunicationService;
 import io.atomix.cluster.messaging.ClusterEventService;
 import io.zeebe.broker.Loggers;
 import io.zeebe.broker.exporter.stream.ExporterColumnFamilies;
 import io.zeebe.broker.exporter.stream.ExporterStreamProcessorState;
 import io.zeebe.broker.logstreams.ZbStreamProcessorService;
+import io.zeebe.broker.logstreams.state.DefaultOnDemandSnapshotReplication;
 import io.zeebe.broker.logstreams.state.DefaultZeebeDbFactory;
 import io.zeebe.broker.logstreams.state.StateReplication;
 import io.zeebe.broker.logstreams.state.StateStorageFactory;
@@ -48,8 +50,11 @@ public class Partition implements Service<Partition> {
   public static final Logger LOG = Loggers.CLUSTERING_LOGGER;
   private final ClusterEventService eventService;
   private final BrokerCfg brokerCfg;
+  private final ClusterCommunicationService communicationService;
   private SnapshotReplication processorStateReplication;
   private SnapshotReplication exporterStateReplication;
+  private DefaultOnDemandSnapshotReplication processorSnapshotRequestServer;
+  private DefaultOnDemandSnapshotReplication exporterSnapshotRequestServer;
 
   public static String getPartitionName(final int partitionId) {
     return String.format(PARTITION_NAME_FORMAT, partitionId);
@@ -67,12 +72,14 @@ public class Partition implements Service<Partition> {
   public Partition(
       BrokerCfg brokerCfg,
       ClusterEventService eventService,
+      ClusterCommunicationService communicationService,
       final int partitionId,
       final RaftState state) {
     this.brokerCfg = brokerCfg;
     this.partitionId = partitionId;
     this.state = state;
     this.eventService = eventService;
+    this.communicationService = communicationService;
   }
 
   @Override
@@ -115,6 +122,21 @@ public class Partition implements Service<Partition> {
 
       processorSnapshotController.consumeReplicatedSnapshots(logStream::delete);
       exporterSnapshotController.consumeReplicatedSnapshots(pos -> {});
+    } else {
+      processorSnapshotRequestServer =
+          new DefaultOnDemandSnapshotReplication(
+              communicationService, partitionId, ZbStreamProcessorService.PROCESSOR_NAME);
+      processorSnapshotRequestServer.serve(
+          (request, context) -> {
+            LOG.info("Received snapshot replication request for partition {}", partitionId);
+            processorSnapshotController.replicateLatestSnapshot(context::execute);
+          });
+      exporterSnapshotRequestServer =
+          new DefaultOnDemandSnapshotReplication(
+              communicationService, partitionId, exporterProcessorName);
+      exporterSnapshotRequestServer.serve(
+          (request, context) ->
+              exporterSnapshotController.replicateLatestSnapshot(context::execute));
     }
   }
 
@@ -157,6 +179,12 @@ public class Partition implements Service<Partition> {
   public void stop(ServiceStopContext stopContext) {
     processorStateReplication.close();
     exporterStateReplication.close();
+    if (processorSnapshotRequestServer != null) {
+      processorSnapshotRequestServer.close();
+    }
+    if (exporterSnapshotRequestServer != null) {
+      exporterSnapshotRequestServer.close();
+    }
   }
 
   @Override
