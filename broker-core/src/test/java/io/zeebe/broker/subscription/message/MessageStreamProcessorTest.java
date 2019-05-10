@@ -375,6 +375,53 @@ public class MessageStreamProcessorTest {
     assertAllMessagesReceived(subscription, first, second);
   }
 
+  @Test
+  public void shouldCorrelateToFirstSubscriptionAfterRejection() {
+    // given
+    final MessageRecord message = message();
+    final MessageSubscriptionRecord firstSubscription =
+        messageSubscription().setElementInstanceKey(5L);
+    final MessageSubscriptionRecord secondSubscription =
+        messageSubscription().setElementInstanceKey(10L);
+    streamProcessor.blockAfterMessageSubscriptionEvent(
+        r ->
+            r.getMetadata().getIntent() == MessageSubscriptionIntent.OPENED
+                && r.getValue().getElementInstanceKey()
+                    == secondSubscription.getElementInstanceKey());
+
+    // when
+    rule.writeCommand(MessageIntent.PUBLISH, message);
+    rule.writeCommand(MessageSubscriptionIntent.OPEN, firstSubscription);
+    rule.writeCommand(MessageSubscriptionIntent.OPEN, secondSubscription);
+    waitUntil(streamProcessor::isBlocked);
+
+    final long messageKey =
+        rule.events().onlyMessageRecords().withIntent(MessageIntent.PUBLISHED).getFirst().getKey();
+    firstSubscription.setMessageKey(messageKey);
+    rule.writeCommand(MessageSubscriptionIntent.RESET, firstSubscription);
+    streamProcessor.unblock();
+
+    // then
+    final ArgumentCaptor<DirectBuffer> captor = ArgumentCaptor.forClass(DirectBuffer.class);
+    verify(mockSubscriptionCommandSender, timeout(5_000))
+        .correlateWorkflowInstanceSubscription(
+            eq(firstSubscription.getWorkflowInstanceKey()),
+            eq(firstSubscription.getElementInstanceKey()),
+            captor.capture(),
+            eq(messageKey),
+            any(DirectBuffer.class));
+    assertThat(BufferUtil.equals(captor.getValue(), firstSubscription.getMessageName())).isTrue();
+
+    verify(mockSubscriptionCommandSender, timeout(5_000))
+        .correlateWorkflowInstanceSubscription(
+            eq(secondSubscription.getWorkflowInstanceKey()),
+            eq(secondSubscription.getElementInstanceKey()),
+            captor.capture(),
+            eq(messageKey),
+            any(DirectBuffer.class));
+    assertThat(BufferUtil.equals(captor.getValue(), secondSubscription.getMessageName())).isTrue();
+  }
+
   private void assertAllMessagesReceived(
       MessageSubscriptionRecord subscription, MessageRecord first, MessageRecord second) {
     final ArgumentCaptor<DirectBuffer> nameCaptor = ArgumentCaptor.forClass(DirectBuffer.class);

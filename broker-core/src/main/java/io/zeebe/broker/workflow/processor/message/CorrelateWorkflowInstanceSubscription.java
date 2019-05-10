@@ -178,7 +178,7 @@ public final class CorrelateWorkflowInstanceSubscription
   }
 
   private boolean sendRejectionCommand() {
-    return subscriptionCommandSender.resetMessageCorrelation(
+    return subscriptionCommandSender.rejectCorrelateMessageSubscription(
         subscriptionRecord.getWorkflowInstanceKey(),
         subscriptionRecord.getElementInstanceKey(),
         subscriptionRecord.getMessageKey(),

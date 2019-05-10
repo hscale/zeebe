@@ -77,7 +77,8 @@ public class MessageEventProcessors {
         .onCommand(
             ValueType.MESSAGE_SUBSCRIPTION,
             MessageSubscriptionIntent.RESET,
-            new ResetMessageCorrelationProcessor(messageState, subscriptionState))
+            new ResetMessageCorrelationProcessor(
+                messageState, subscriptionState, subscriptionCommandSender))
         .onCommand(
             ValueType.MESSAGE_START_EVENT_SUBSCRIPTION,
             MessageStartEventSubscriptionIntent.OPEN,

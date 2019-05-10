@@ -25,7 +25,7 @@ import io.zeebe.broker.subscription.CorrelateWorkflowInstanceSubscriptionDecoder
 import io.zeebe.broker.subscription.MessageHeaderDecoder;
 import io.zeebe.broker.subscription.OpenMessageSubscriptionDecoder;
 import io.zeebe.broker.subscription.OpenWorkflowInstanceSubscriptionDecoder;
-import io.zeebe.broker.subscription.ResetMessageCorrelationDecoder;
+import io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionDecoder;
 import io.zeebe.broker.subscription.message.data.MessageSubscriptionRecord;
 import io.zeebe.broker.subscription.message.data.WorkflowInstanceSubscriptionRecord;
 import io.zeebe.logstreams.log.LogStreamRecordWriter;
@@ -69,8 +69,8 @@ public class SubscriptionApiCommandMessageHandler
   private final CloseWorkflowInstanceSubscriptionCommand closeWorkflowInstanceSubscriptionCommand =
       new CloseWorkflowInstanceSubscriptionCommand();
 
-  private final ResetMessageCorrelationCommand resetMessageCorrelationCommand =
-      new ResetMessageCorrelationCommand();
+  private final RejectCorrelateMessageSubscriptionCommand resetMessageCorrelationCommand =
+      new RejectCorrelateMessageSubscriptionCommand();
 
   private final LogStreamRecordWriter logStreamWriter = new LogStreamWriterImpl();
   private final RecordMetadata recordMetadata = new RecordMetadata();
@@ -121,8 +121,8 @@ public class SubscriptionApiCommandMessageHandler
               case CloseWorkflowInstanceSubscriptionDecoder.TEMPLATE_ID:
                 onCloseWorkflowInstanceSubscription(buffer, offset, length);
                 break;
-              case ResetMessageCorrelationDecoder.TEMPLATE_ID:
-                onResetMessageCorrelation(buffer, offset, length);
+              case RejectCorrelateMessageSubscriptionDecoder.TEMPLATE_ID:
+                onRejectCorrelateMessageSubscription(buffer, offset, length);
                 break;
               default:
                 break;
@@ -256,7 +256,8 @@ public class SubscriptionApiCommandMessageHandler
         workflowInstanceSubscriptionRecord);
   }
 
-  private boolean onResetMessageCorrelation(DirectBuffer buffer, int offset, int length) {
+  private boolean onRejectCorrelateMessageSubscription(
+      DirectBuffer buffer, int offset, int length) {
     resetMessageCorrelationCommand.wrap(buffer, offset, length);
 
     final long workflowInstanceKey = resetMessageCorrelationCommand.getWorkflowInstanceKey();
@@ -264,7 +265,7 @@ public class SubscriptionApiCommandMessageHandler
     messageSubscriptionRecord.reset();
     messageSubscriptionRecord
         .setWorkflowInstanceKey(workflowInstanceKey)
-        .setElementInstanceKey(resetMessageCorrelationCommand.getElementInstanceKey())
+        .setElementInstanceKey(-1L)
         .setMessageName(resetMessageCorrelationCommand.getMessageName())
         .setCorrelationKey(resetMessageCorrelationCommand.getCorrelationKey())
         .setMessageKey(resetMessageCorrelationCommand.getMessageKey())

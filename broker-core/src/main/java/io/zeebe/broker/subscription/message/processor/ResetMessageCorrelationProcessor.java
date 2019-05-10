@@ -17,16 +17,18 @@
  */
 package io.zeebe.broker.subscription.message.processor;
 
+import io.zeebe.broker.logstreams.processor.SideEffectProducer;
 import io.zeebe.broker.logstreams.processor.TypedRecord;
 import io.zeebe.broker.logstreams.processor.TypedRecordProcessor;
 import io.zeebe.broker.logstreams.processor.TypedResponseWriter;
 import io.zeebe.broker.logstreams.processor.TypedStreamWriter;
+import io.zeebe.broker.subscription.command.SubscriptionCommandSender;
 import io.zeebe.broker.subscription.message.data.MessageSubscriptionRecord;
 import io.zeebe.broker.subscription.message.state.MessageState;
 import io.zeebe.broker.subscription.message.state.MessageSubscription;
 import io.zeebe.broker.subscription.message.state.MessageSubscriptionState;
 import io.zeebe.protocol.clientapi.RejectionType;
-import io.zeebe.protocol.intent.MessageSubscriptionIntent;
+import java.util.function.Consumer;
 
 public class ResetMessageCorrelationProcessor
     implements TypedRecordProcessor<MessageSubscriptionRecord> {
@@ -34,18 +36,24 @@ public class ResetMessageCorrelationProcessor
   private final MessageState messageState;
   private final MessageSubscriptionState subscriptionState;
   private final MessageSubscriptionRecord correlateMessageRecord = new MessageSubscriptionRecord();
+  private final MessageCorrelator messageCorrelator;
 
   public ResetMessageCorrelationProcessor(
-      final MessageState messageState, final MessageSubscriptionState subscriptionState) {
+      final MessageState messageState,
+      final MessageSubscriptionState subscriptionState,
+      final SubscriptionCommandSender subscriptionCommandSender) {
     this.messageState = messageState;
     this.subscriptionState = subscriptionState;
+    this.messageCorrelator =
+        new MessageCorrelator(messageState, subscriptionState, subscriptionCommandSender);
   }
 
   @Override
   public void processRecord(
       final TypedRecord<MessageSubscriptionRecord> record,
       final TypedResponseWriter responseWriter,
-      final TypedStreamWriter streamWriter) {
+      final TypedStreamWriter streamWriter,
+      final Consumer<SideEffectProducer> sideEffect) {
 
     final MessageSubscriptionRecord subscriptionRecord = record.getValue();
     final long messageKey = record.getValue().getMessageKey();
@@ -62,20 +70,30 @@ public class ResetMessageCorrelationProcessor
     }
     messageState.removeMessageCorrelation(messageKey, workflowInstanceKey);
 
-    final MessageSubscription subscription =
-        subscriptionState.get(
-            subscriptionRecord.getElementInstanceKey(), subscriptionRecord.getMessageName());
+    subscriptionState.visitSubscriptions(
+        subscriptionRecord.getMessageName(),
+        subscriptionRecord.getCorrelationKey(),
+        subscription -> {
+          if (!subscription.isCorrelating()) {
+            correlateMessage(streamWriter, subscription, sideEffect);
+            return false;
+          }
+          return true;
+        });
+  }
 
-    if (subscription != null) {
-      correlateMessageRecord.reset();
-      correlateMessageRecord
-          .setMessageKey(subscription.getMessageKey())
-          .setWorkflowInstanceKey(subscription.getWorkflowInstanceKey())
-          .setElementInstanceKey(subscription.getElementInstanceKey())
-          .setCorrelationKey(subscription.getCorrelationKey())
-          .setMessageName(subscription.getMessageName());
+  private void correlateMessage(
+      final TypedStreamWriter streamWriter,
+      final MessageSubscription subscription,
+      final Consumer<SideEffectProducer> sideEffect) {
+    correlateMessageRecord.reset();
+    correlateMessageRecord
+        .setMessageKey(subscription.getMessageKey())
+        .setWorkflowInstanceKey(subscription.getWorkflowInstanceKey())
+        .setElementInstanceKey(subscription.getElementInstanceKey())
+        .setCorrelationKey(subscription.getCorrelationKey())
+        .setMessageName(subscription.getMessageName());
 
-      streamWriter.appendNewCommand(MessageSubscriptionIntent.CORRELATE, correlateMessageRecord);
-    }
+    messageCorrelator.correlateNextMessage(subscription, correlateMessageRecord, sideEffect);
   }
 }

@@ -113,7 +113,7 @@ public class WorkflowInstanceStreamProcessorRule extends ExternalResource
     when(mockSubscriptionCommandSender.closeMessageSubscription(
             anyInt(), anyLong(), anyLong(), any(DirectBuffer.class)))
         .thenReturn(true);
-    when(mockSubscriptionCommandSender.resetMessageCorrelation(
+    when(mockSubscriptionCommandSender.rejectCorrelateMessageSubscription(
             anyLong(), anyLong(), anyLong(), any(), any()))
         .thenReturn(true);
 

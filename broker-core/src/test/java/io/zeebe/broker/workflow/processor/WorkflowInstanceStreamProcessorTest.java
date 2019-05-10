@@ -434,7 +434,7 @@ public class WorkflowInstanceStreamProcessorTest {
     BufferUtil.equals(captor.getValue(), subscription.getMessageName());
 
     verify(streamProcessorRule.getMockSubscriptionCommandSender(), timeout(5_000))
-        .resetMessageCorrelation(
+        .rejectCorrelateMessageSubscription(
             eq(subscription.getWorkflowInstanceKey()),
             eq(subscription.getElementInstanceKey()),
             eq(subscription.getMessageKey()),

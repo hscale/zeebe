@@ -17,24 +17,27 @@
  */
 package io.zeebe.broker.subscription.command;
 
-import static io.zeebe.broker.subscription.ResetMessageCorrelationDecoder.correlationKeyHeaderLength;
-import static io.zeebe.broker.subscription.ResetMessageCorrelationDecoder.workflowInstanceKeyNullValue;
-import static io.zeebe.broker.subscription.ResetMessageCorrelationEncoder.elementInstanceKeyNullValue;
-import static io.zeebe.broker.subscription.ResetMessageCorrelationEncoder.messageNameHeaderLength;
-import static io.zeebe.broker.subscription.ResetMessageCorrelationEncoder.subscriptionPartitionIdNullValue;
+import static io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionDecoder.messageKeyNullValue;
+import static io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionDecoder.workflowInstanceKeyNullValue;
+import static io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionEncoder.correlationKeyHeaderLength;
+import static io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionEncoder.messageNameHeaderLength;
+import static io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionEncoder.subscriptionPartitionIdNullValue;
 
-import io.zeebe.broker.subscription.ResetMessageCorrelationDecoder;
-import io.zeebe.broker.subscription.ResetMessageCorrelationEncoder;
+import io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionDecoder;
+import io.zeebe.broker.subscription.RejectCorrelateMessageSubscriptionEncoder;
 import io.zeebe.broker.util.SbeBufferWriterReader;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class ResetMessageCorrelationCommand
-    extends SbeBufferWriterReader<ResetMessageCorrelationEncoder, ResetMessageCorrelationDecoder> {
+public class RejectCorrelateMessageSubscriptionCommand
+    extends SbeBufferWriterReader<
+        RejectCorrelateMessageSubscriptionEncoder, RejectCorrelateMessageSubscriptionDecoder> {
 
-  private final ResetMessageCorrelationEncoder encoder = new ResetMessageCorrelationEncoder();
-  private final ResetMessageCorrelationDecoder decoder = new ResetMessageCorrelationDecoder();
+  private final RejectCorrelateMessageSubscriptionEncoder encoder =
+      new RejectCorrelateMessageSubscriptionEncoder();
+  private final RejectCorrelateMessageSubscriptionDecoder decoder =
+      new RejectCorrelateMessageSubscriptionDecoder();
 
   private int subscriptionPartitionId;
   private long workflowInstanceKey;
@@ -45,12 +48,12 @@ public class ResetMessageCorrelationCommand
   private final UnsafeBuffer correlationKey = new UnsafeBuffer(0, 0);
 
   @Override
-  protected ResetMessageCorrelationEncoder getBodyEncoder() {
+  protected RejectCorrelateMessageSubscriptionEncoder getBodyEncoder() {
     return encoder;
   }
 
   @Override
-  protected ResetMessageCorrelationDecoder getBodyDecoder() {
+  protected RejectCorrelateMessageSubscriptionDecoder getBodyDecoder() {
     return decoder;
   }
 
@@ -70,7 +73,6 @@ public class ResetMessageCorrelationCommand
     encoder
         .subscriptionPartitionId(subscriptionPartitionId)
         .workflowInstanceKey(workflowInstanceKey)
-        .elementInstanceKey(elementInstanceKey)
         .messageKey(messageKey)
         .putMessageName(messageName, 0, messageName.capacity())
         .putCorrelationKey(correlationKey, 0, correlationKey.capacity());
@@ -82,7 +84,6 @@ public class ResetMessageCorrelationCommand
 
     subscriptionPartitionId = decoder.subscriptionPartitionId();
     workflowInstanceKey = decoder.workflowInstanceKey();
-    elementInstanceKey = decoder.elementInstanceKey();
     messageKey = decoder.messageKey();
 
     decoder.wrapMessageName(messageName);
@@ -93,8 +94,7 @@ public class ResetMessageCorrelationCommand
   public void reset() {
     subscriptionPartitionId = subscriptionPartitionIdNullValue();
     workflowInstanceKey = workflowInstanceKeyNullValue();
-    elementInstanceKey = elementInstanceKeyNullValue();
-    messageKey = ResetMessageCorrelationDecoder.messageKeyNullValue();
+    messageKey = messageKeyNullValue();
     messageName.wrap(0, 0);
     correlationKey.wrap(0, 0);
   }
@@ -113,14 +113,6 @@ public class ResetMessageCorrelationCommand
 
   public void setWorkflowInstanceKey(long workflowInstanceKey) {
     this.workflowInstanceKey = workflowInstanceKey;
-  }
-
-  public long getElementInstanceKey() {
-    return elementInstanceKey;
-  }
-
-  public void setElementInstanceKey(long elementInstanceKey) {
-    this.elementInstanceKey = elementInstanceKey;
   }
 
   public long getMessageKey() {

@@ -73,8 +73,8 @@ public class SubscriptionCommandSender {
   private final CloseWorkflowInstanceSubscriptionCommand closeWorkflowInstanceSubscriptionCommand =
       new CloseWorkflowInstanceSubscriptionCommand();
 
-  private final ResetMessageCorrelationCommand resetMessageCorrelationCommand =
-      new ResetMessageCorrelationCommand();
+  private final RejectCorrelateMessageSubscriptionCommand
+      rejectCorrelateMessageSubscriptionCommand = new RejectCorrelateMessageSubscriptionCommand();
 
   private final Atomix atomix;
 
@@ -192,7 +192,7 @@ public class SubscriptionCommandSender {
         workflowInstancePartitionId, closeWorkflowInstanceSubscriptionCommand);
   }
 
-  public boolean resetMessageCorrelation(
+  public boolean rejectCorrelateMessageSubscription(
       final long workflowInstanceKey,
       final long elementInstanceKey,
       final long messageKey,
@@ -201,14 +201,14 @@ public class SubscriptionCommandSender {
 
     final int workflowInstancePartitionId = Protocol.decodePartitionId(workflowInstanceKey);
 
-    resetMessageCorrelationCommand.setSubscriptionPartitionId(partitionId);
-    resetMessageCorrelationCommand.setWorkflowInstanceKey(workflowInstanceKey);
-    resetMessageCorrelationCommand.setElementInstanceKey(elementInstanceKey);
-    resetMessageCorrelationCommand.setMessageKey(messageKey);
-    resetMessageCorrelationCommand.getMessageName().wrap(messageName);
-    resetMessageCorrelationCommand.getCorrelationKey().wrap(correlationKey);
+    rejectCorrelateMessageSubscriptionCommand.setSubscriptionPartitionId(partitionId);
+    rejectCorrelateMessageSubscriptionCommand.setWorkflowInstanceKey(workflowInstanceKey);
+    rejectCorrelateMessageSubscriptionCommand.setMessageKey(messageKey);
+    rejectCorrelateMessageSubscriptionCommand.getMessageName().wrap(messageName);
+    rejectCorrelateMessageSubscriptionCommand.getCorrelationKey().wrap(correlationKey);
 
-    return sendSubscriptionCommand(workflowInstancePartitionId, resetMessageCorrelationCommand);
+    return sendSubscriptionCommand(
+        workflowInstancePartitionId, rejectCorrelateMessageSubscriptionCommand);
   }
 
   private boolean sendSubscriptionCommand(
