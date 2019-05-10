@@ -21,7 +21,6 @@ import io.zeebe.broker.util.SbeBufferWriterReader;
 import io.zeebe.clustering.management.RestoreInfoResponseDecoder;
 import io.zeebe.clustering.management.RestoreInfoResponseEncoder;
 import io.zeebe.distributedlog.restore.RestoreInfoResponse;
-import io.zeebe.distributedlog.restore.RestoreStrategy.ReplicationTarget;
 import io.zeebe.distributedlog.restore.impl.DefaultRestoreInfoResponse;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
